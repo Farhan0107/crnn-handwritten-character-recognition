@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Virtual Environment
+venv/
+env/
+.env
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# macOS
+.DS_Store
+
+# Data & large files (re-downloadable)
+data/emnist/
+
+# Model checkpoints (optional — comment out if you want to push the model)
+# checkpoints/
+
+# Logs
+*.log
