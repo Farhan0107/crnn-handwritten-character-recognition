@@ -142,6 +142,25 @@ Open `dashboard.html` in any browser.
 
 ---
 
+Check out the live demo here: [khan0107/crnn-handwritten-character-recognition-hindi-english-ocr](https://huggingface.co/spaces/khan0107/crnn-handwritten-character-recognition-hindi-english-ocr)
+
+---
+
+## 🚀 Deployment (Hugging Face Spaces)
+
+This project is fully containerized and compatible with Hugging Face Spaces.
+
+1. **Dockerized Setup:** Uses `python:3.9-slim` with optimized OpenCV dependencies.
+2. **Auto-Port Detection:** Backend automatically detects `PORT` for cloud environments.
+3. **Git LFS:** Uses Git Large File Storage for model weights (`*.pth`).
+
+To deploy your own:
+1. Create a "Docker" Space on Hugging Face.
+2. Push this repository to the Space remote.
+3. Hugging Face will automatically build and launch the dashboard.
+
+---
+
 ## 📊 Baseline Training Results (English)
 
 | Epoch | Accuracy |
