@@ -580,6 +580,48 @@
             color: var(--text);
         }
 
+        .engine-selector {
+            margin: 0 24px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .engine-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--muted);
+        }
+
+        .engine-options {
+            display: flex;
+            gap: 8px;
+            background: var(--surface);
+            padding: 4px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+
+        .engine-opt {
+            flex: 1;
+            padding: 8px 12px;
+            border: none;
+            background: transparent;
+            color: var(--text);
+            font-size: 11px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .engine-opt.active {
+            background: var(--surface2);
+            color: var(--accent);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
         .process-btn {
             margin: 0 24px 24px;
             width: calc(100% - 48px);
@@ -1426,6 +1468,16 @@
                     </div>
                 </div>
 
+                <div class="engine-selector">
+                    <div class="engine-label">OCR Engine / Algorithm</div>
+                    <div class="engine-options">
+                        <button class="engine-opt active" id="engCrnn" onclick="setEngine('crnn')">English
+                            (CRNN)</button>
+                        <button class="engine-opt" id="engEasy" onclick="setEngine('easyocr')">Hindi/Multi
+                            (EasyOCR)</button>
+                    </div>
+                </div>
+
                 <button class="process-btn" id="processBtn" disabled onclick="processImage()">
                     <span class="btn-text">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -1562,7 +1614,15 @@
 
         let currentImageData = null;
         let currentImageBase64 = null;
+        let selectedEngine = 'crnn';
         let history = [];
+
+        function setEngine(engine) {
+            selectedEngine = engine;
+            document.getElementById('engCrnn').classList.toggle('active', engine === 'crnn');
+            document.getElementById('engEasy').classList.toggle('active', engine === 'easyocr');
+            showToast(`Engine switched to: ${engine.toUpperCase()}`);
+        }
 
         // ✅ CHANGE 2: Check server status on page load
         async function checkServer() {
@@ -1673,6 +1733,15 @@
                 currentImageBase64 = dataUrl.split(',')[1];
                 currentImageData = { name: name || 'input.png', width: img.width, height: img.height, size };
 
+                // Capture thumbnail for history immediately while it's in the canvas
+                const thumbCanvas = document.createElement('canvas');
+                const tctx = thumbCanvas.getContext('2d');
+                thumbCanvas.width = 120; thumbCanvas.height = 70;
+                tctx.fillStyle = '#1a1a24'; tctx.fillRect(0, 0, 120, 70);
+                const s = Math.min(120 / img.width, 70 / img.height);
+                tctx.drawImage(img, (120 - img.width * s) / 2, (70 - img.height * s) / 2, img.width * s, img.height * s);
+                currentImageData.thumbUrl = thumbCanvas.toDataURL('image/jpeg', 0.8);
+
                 document.getElementById('metaName').textContent = (name || 'drawn').length > 18 ? (name || 'drawn').slice(0, 15) + '…' : (name || 'drawn');
                 document.getElementById('metaDims').textContent = `${img.width}×${img.height}`;
                 document.getElementById('metaSize').textContent = size ? formatSize(size) : 'Canvas';
@@ -1735,7 +1804,10 @@
                 response = await fetch(`${SERVER}/predict`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ image: base64Image, mode: 'single' }),
+                    body: JSON.stringify({
+                        image: base64Image,
+                        engine: selectedEngine
+                    }),
                     signal: AbortSignal.timeout(60000),   // 60s for documents
                 });
             } catch {
@@ -1783,21 +1855,29 @@
                 });
             }
 
-            const conf = Math.round((result.confidence || 0.5) * 100);
-            document.getElementById('mConf').textContent = conf + '%';
-            document.getElementById('mChars').textContent = result.char_count || text.replace(/\n/g, '').length;
-            document.getElementById('mTime').textContent = elapsed + 's';
-            document.getElementById('mLines').textContent = result.line_count || 1;
-            document.getElementById('mMode').textContent = result.mode === 'document' ? '📄 Document OCR' : '🔤 Single Char';
-            document.getElementById('confPct').textContent = conf + '%';
-            setTimeout(() => { document.getElementById('confBar').style.width = conf + '%'; }, 100);
+            // Update stats
+            document.getElementById('mConf').textContent = `${(result.confidence * 100).toFixed(0)}%`;
+            document.getElementById('mChars').textContent = result.char_count;
+            document.getElementById('mTime').textContent = `${elapsed}s`;
+            document.getElementById('mLines').textContent = result.line_count;
+
+            // Updated mode detection
+            let modeText = '🧩 Single Char';
+            if (result.mode === 'document') modeText = '📄 Document OCR';
+            if (result.mode === 'CRNN - Word Flow') modeText = '〰️ Word Flow';
+            if (result.mode === 'EasyOCR' || selectedEngine === 'easyocr') modeText = '🌏 EasyOCR (Word)';
+            if (result.mode === 'CRNN') modeText = '🧱 Custom CRNN';
+
+            document.getElementById('mMode').textContent = modeText;
+            document.getElementById('confPct').textContent = `${(result.confidence * 100).toFixed(0)}%`; // Assuming confPct is the same as mAccText
+            setTimeout(() => { document.getElementById('confBar').style.width = `${(result.confidence * 100)}%`; }, 100);
             document.getElementById('resultTimestamp').textContent = new Date().toLocaleTimeString();
-            showToast(`Recognition complete · ${conf}% confidence · ${result.line_count || 1} line(s)`);
+            showToast(`Recognition complete · ${(result.confidence * 100).toFixed(0)}% confidence · ${result.line_count || 1} line(s)`);
         }
 
         // ── History ─────────────────────────────────────────────
         function addToHistory(result, imgData, elapsed) {
-            const thumbUrl = document.getElementById('previewCanvas').toDataURL('image/jpeg', 0.6);
+            const thumbUrl = imgData.thumbUrl || '';
             history.unshift({ result, imgData, elapsed, thumbUrl, time: new Date() });
             renderHistory();
         }

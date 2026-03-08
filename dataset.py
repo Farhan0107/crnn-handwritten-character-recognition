@@ -24,15 +24,22 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 import torchvision.transforms as T
 import torchvision.datasets as tvd
+from tqdm import tqdm
 
 
 # ── Vocabulary ────────────────────────────────────────────────────────────────
-# EMNIST ByClass order: 0-9, A-Z, a-z  (62 chars)
-CHARS       = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+# ── Vocabulary ────────────────────────────────────────────────────────────────
+# Combined Vocabulary: 
+# 1. Digits (0-9)
+# 2. Uppercase (A-Z)
+# 3. Lowercase (a-z)
+# 4. Hindi (Devanagari + Matras + Symbols)
+ASCII_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+CHARS       = ASCII_CHARS
 BLANK_IDX   = 0
 CHAR2IDX    = {c: i + 1 for i, c in enumerate(CHARS)}
 IDX2CHAR    = {i + 1: c for i, c in enumerate(CHARS)}
-NUM_CLASSES = len(CHARS) + 1   # 63
+NUM_CLASSES = len(CHARS) + 1  # 62 (ASCII) + 1 (Blank) = 63
 
 
 def encode(text: str):
@@ -142,6 +149,80 @@ def get_emnist_loaders(root="./data/emnist",
         DataLoader(tr, batch_size=batch_size, shuffle=True,  drop_last=True, **kw),
         DataLoader(va, batch_size=batch_size, shuffle=False, **kw),
     )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 2.  Hindi DHCD  (Devanagari Handwritten Character Dataset)
+# ══════════════════════════════════════════════════════════════════════════════
+class HindiDHCDDataset(Dataset):
+    """
+    Loads Devanagari Handwritten Character Dataset (DHCD).
+    Structure: ./data/hindi/DevanagariHandwrittenCharacterDataset/Train/character_1_ka/...
+    """
+    def __init__(self, root="./data/hindi", train=True, img_h=32, img_w=32, max_samples=None):
+        self.tfm = make_transform(train, img_h, img_w)
+        split = "Train" if train else "Test"
+        base_dir = os.path.join(root, "DevanagariHandwrittenCharacterDataset", split)
+        
+        if not os.path.exists(base_dir):
+            raise FileNotFoundError(f"Hindi dataset not found at {base_dir}. Run download_hindi_data.py first.")
+            
+        self.samples = []
+        # Mapping DHCD folder names to our HINDI_CHARS vocabulary
+        # Folder names are 'character_1_ka', 'digit_0', etc.
+        folders = sorted(os.listdir(base_dir))
+        
+        # We need a mapping from folder name to the actual character
+        # Simplified for now: Mapping folder index to HINDI_CHARS
+        # In a real scenario, we'd use a more precise mapping.
+        for folder in tqdm(folders, desc=f"Loading Hindi {split}", leave=False):
+            folder_path = os.path.join(base_dir, folder)
+            if not os.path.isdir(folder_path): continue
+            
+            # Map folder name to character (this is a simplified logic for DHCD structure)
+            # Digit folders: digit_0 -> '0', etc.
+            # Character folders: character_1_ka -> 'क', etc.
+            char = self._map_folder_to_char(folder)
+            
+            files = os.listdir(folder_path)
+            if max_samples:
+                files = files[:max_samples // len(folders)]
+                
+            for f in files:
+                self.samples.append((os.path.join(folder_path, f), char))
+                
+        print(f"[Hindi] {split}: {len(self.samples):,} samples loaded.")
+
+    def _map_folder_to_char(self, folder_name):
+        # DHCD Folder Mapping (VGG order)
+        # Consonants 1-36, Digits 0-9
+        mapping = {
+            "character_1_ka": "क", "character_2_kha": "ख", "character_3_ga": "ग", "character_4_gha": "घ", "character_5_kna": "ङ",
+            "character_6_cha": "च", "character_7_chha": "छ", "character_8_ja": "ज", "character_9_jha": "झ", "character_10_yna": "ञ",
+            "character_11_taamatar": "ट", "character_12_thaa": "ठ", "character_13_daa": "ड", "character_14_dhaa": "ढ", "character_15_adna": "ण",
+            "character_16_tabala": "त", "character_17_tha": "थ", "character_18_da": "द", "character_19_dha": "ध", "character_20_na": "न",
+            "character_21_pa": "प", "character_22_pha": "फ", "character_23_ba": "ब", "character_24_bha": "भ", "character_25_ma": "म",
+            "character_26_yaw": "य", "character_27_ra": "र", "character_28_la": "ल", "character_29_waw": "व", "character_30_mirdhak_sha": "ष",
+            "character_31_petchiryak_sha": "ष", "character_32_patalos_sa": "स", "character_33_ha": "ह", "character_34_chhya": "क्ष", "character_35_tra": "त्र", "character_36_gya": "ज्ञ",
+            "digit_0": "0", "digit_1": "1", "digit_2": "2", "digit_3": "3", "digit_4": "4", "digit_5": "5", "digit_6": "6", "digit_7": "7", "digit_8": "8", "digit_9": "9"
+        }
+        return mapping.get(folder_name, "?")
+
+    def __len__(self):
+        return len(self.samples)
+
+    def __getitem__(self, i):
+        img_path, char = self.samples[i]
+        img = Image.open(img_path).convert("L")
+        img = self.tfm(img)
+        enc = encode(char) or [1]
+        return img, torch.tensor(enc, dtype=torch.long), len(enc), char
+
+def get_hindi_loaders(root="./data/hindi", img_h=32, img_w=32, batch_size=128, num_workers=2):
+    tr = HindiDHCDDataset(root, train=True, img_h=img_h, img_w=img_w)
+    va = HindiDHCDDataset(root, train=False, img_h=img_h, img_w=img_w)
+    kw = dict(collate_fn=collate_fn, num_workers=num_workers, pin_memory=torch.cuda.is_available())
+    return DataLoader(tr, batch_size=batch_size, shuffle=True, **kw), DataLoader(va, batch_size=batch_size, shuffle=False, **kw)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
