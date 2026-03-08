@@ -97,31 +97,39 @@ char_transform = T.Compose([T.ToTensor(), T.Normalize([0.5], [0.5])])
 def enhance_for_easyocr(pil_img):
     """
     Prepare image for EasyOCR.
-    - Upscales small images (needs ~32px tall text minimum)
-    - Boosts contrast with CLAHE
-    - Inverts dark-background images (canvas drawings)
+    - Upscales small images
+    - Detects if it's a digital canvas (high contrast) or a photo
+    - Applies sharp thresholding or CLAHE accordingly
     """
     img = pil_img.convert('RGB')
     w, h = img.size
 
-    # Upscale tiny images
-    if h < 100:
-        scale = max(2, 100 // h)
+    # 1. Upscale significantly (EasyOCR works best on large text)
+    if h < 200:
+        scale = max(2, 300 // h)
         img   = img.resize((w * scale, h * scale), Image.LANCZOS)
 
     arr  = np.array(img)
     gray = cv2.cvtColor(arr, cv2.COLOR_RGB2GRAY)
+    is_canvas = gray.mean() < 80  # Dark background = likely digital canvas
 
-    # Invert if dark background (canvas = white strokes on black bg)
-    if gray.mean() < 100:
+    if is_canvas:
+        # Digital Canvas: Invert + Thicken (Dilation)
         arr = cv2.bitwise_not(arr)
-
-    # CLAHE contrast enhancement
-    lab       = cv2.cvtColor(arr, cv2.COLOR_RGB2LAB)
-    l, a, b   = cv2.split(lab)
-    clahe     = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
-    l         = clahe.apply(l)
-    arr       = cv2.cvtColor(cv2.merge([l, a, b]), cv2.COLOR_LAB2RGB)
+        # Convert to gray for morphological ops
+        gray_inv = cv2.cvtColor(arr, cv2.COLOR_RGB2GRAY)
+        _, thresh = cv2.threshold(gray_inv, 150, 255, cv2.THRESH_BINARY)
+        # Thicken strokes slightly so EasyOCR sees them as "printed" letters
+        kernel = np.ones((2, 2), np.uint8)
+        dilated = cv2.erode(thresh, kernel, iterations=1) # Erode binary white-bg image to thicken black strokes
+        arr = cv2.cvtColor(dilated, cv2.COLOR_GRAY2RGB)
+    else:
+        # Real Photo: Apply CLAHE for contrast
+        lab       = cv2.cvtColor(arr, cv2.COLOR_RGB2LAB)
+        l, a, b   = cv2.split(lab)
+        clahe     = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        l         = clahe.apply(l)
+        arr       = cv2.cvtColor(cv2.merge([l, a, b]), cv2.COLOR_LAB2RGB)
 
     return arr
 
@@ -137,7 +145,7 @@ def binarize(pil_img):
         binary = cv2.bitwise_not(binary)
     return binary
 
-def crop_content(pil_img, padding=10):
+def crop_content(pil_img, padding=30):
     """Crops the image to only include the actual drawing, removing empty margins."""
     # Convert to binary to find content
     binary = binarize(pil_img)
@@ -171,12 +179,27 @@ def process_easyocr(pil_img):
     EasyOCR recognition — handles words, sentences, paragraphs, documents.
     """
     arr     = enhance_for_easyocr(pil_img)
-    results = OCR_READER.readtext(arr, detail=1, paragraph=False, min_size=10, text_threshold=0.3, low_text=0.3, link_threshold=0.3)
+    results = OCR_READER.readtext(
+        arr, 
+        detail=1, 
+        paragraph=False, 
+        min_size=5, 
+        text_threshold=0.2, 
+        low_text=0.2, 
+        link_threshold=0.2,
+        canvas_size=2560 # Higher resolution for better character detail
+    )
     print(f'[EasyOCR] {len(results)} region(s) detected')
 
     if not results:
-        print('[EasyOCR] Nothing found — falling back to CRNN')
-        return process_crnn_multi(pil_img)
+        print('[EasyOCR] Nothing found — returning empty')
+        return {
+            'recognized_text': '[unclear]',
+            'confidence'     : 0.0,
+            'line_count'     : 0,
+            'char_count'     : 0,
+            'mode'           : 'EasyOCR (failed)'
+        }
 
     # Sort top→bottom, then left→right
     results.sort(key=lambda r: (r[0][0][1], r[0][0][0]))
