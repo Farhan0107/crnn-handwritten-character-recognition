@@ -1609,8 +1609,8 @@
            Make sure server.py is running: python server.py
            ═══════════════════════════════════════════════════════ */
 
-        // ✅ CHANGE 1: Point to your local CRNN Flask server
-        const SERVER = 'http://localhost:8080';
+        // Automatic server URL detection (handles both localhost and cloud deployment)
+        const SERVER = window.location.origin;
 
         let currentImageData = null;
         let currentImageBase64 = null;
