@@ -9,16 +9,16 @@ pinned: false
 
 # 🧠 Bilingual Hybrid CRNN Handwriting OCR
 
-A state-of-the-art deep learning system for recognizing handwritten text in both **English** and **Hindi**. This project features a hybrid architecture combining a custom-trained **CRNN (CNN + BiLSTM + CTC)** with the professional **EasyOCR** engine, all accessible via a premium, dark-mode web dashboard.
+A comprehensive deep learning system for recognizing handwritten text in both **English** and **Hindi**. This project features a hybrid architecture combining a custom-trained **CRNN (CNN + BiLSTM + CTC)** with the **EasyOCR** engine, accessible via a user-friendly dark-mode web dashboard.
 
 ---
 
 ## 📸 Key Features
 
-- 🌍 **Bilingual Support:** High-accuracy recognition for English (letters/digits) and Hindi (Devanagari characters + Matras).
-- 🧠 **Hybrid Brain:** 
-  - **English (CRNN):** Custom model optimized for single-character and character-wise English handwriting.
-  - **Hindi/Multi (EasyOCR):** Pre-trained engine handles connected Hindi script, matras, and full sentences.
+- 🌍 **Bilingual Support:** Recognition for English (alphanumeric) and Hindi (Devanagari script).
+- 🧠 **Engine Options:** 
+  - **English (CRNN):** Custom model optimized for character-wise English handwriting trained on EMNIST.
+  - **Hindi/Multi (EasyOCR):** Integrated engine handles complex Hindi matras and connected scripts.
 - 🎨 **Premium Dashboard:** Real-time canvas drawing, batch history with thumbnails, and engine switching.
 - ⚡ **Advanced Preprocessing:** 
   - **Auto-Crop:** Removes white margins to focus on the text. 
