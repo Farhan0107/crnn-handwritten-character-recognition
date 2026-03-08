@@ -451,6 +451,7 @@ def status():
 
 
 if __name__ == '__main__':
-    engine = 'EasyOCR + CRNN fallback' if EASYOCR_AVAILABLE else 'CRNN only'
-    print(f'\n✅  Server ready [{engine}] → http://localhost:{PORT}\n')
-    app.run(host='0.0.0.0', port=PORT, debug=False)
+    # Use port 7860 for Hugging Face Spaces compatibility
+    run_port = int(os.environ.get("PORT", 7860))
+    print(f'\n✅  Server ready → http://0.0.0.0:{run_port}\n')
+    app.run(host='0.0.0.0', port=run_port, debug=False)
