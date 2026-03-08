@@ -1,3 +1,12 @@
+---
+title: Bilingual Hybrid CRNN Handwriting OCR
+emoji: 🧠
+colorFrom: indigo
+colorTo: purple
+sdk: docker
+pinned: false
+---
+
 # 🧠 Bilingual Hybrid CRNN Handwriting OCR
 
 A state-of-the-art deep learning system for recognizing handwritten text in both **English** and **Hindi**. This project features a hybrid architecture combining a custom-trained **CRNN (CNN + BiLSTM + CTC)** with the professional **EasyOCR** engine, all accessible via a premium, dark-mode web dashboard.
@@ -147,15 +156,20 @@ Open `dashboard.html` in any browser.
 
 ---
 
-## � Improving Accuracy
-To improve beyond the current levels, try:
-1. **IAM Dataset:** Training the CRNN on full handwritten lines instead of characters.
-2. **Fine-tuning:** Collect 100+ samples of your own handwriting to specialize the model.
-3. **Bilingual Training:** Simultaneously training on EMNIST (English) and DHCD (Hindi).
+## 🔍 Preprocessing Pipeline
+
+To ensure maximum accuracy, every input goes through:
+1. **Binarization:** Converting color/gray to sharp black & white via Otsu's Thresholding.
+2. **Auto-Cropping:** Using `findNonZero` to identify the bounding box of the script.
+3. **Resizing:** Scaling to 32px height while maintaining aspect ratio (crucial for CRNN).
+4. **Padding:** Adding consistent margins to prevent edge-cutting.
 
 ---
 
-## 📄 License & Acknowledgements
-- **License:** MIT
-- **EMNIST Dataset:** Cohen et al., 2017
-- **Architecture:** Inspired by Shi et al., 2015 (*An End-to-End Trainable Neural Network for Image-based Sequence Recognition*)
+## 🤝 Project Context
+This project was developed as a comprehensive Deep Learning showcase, demonstrating model training, computer vision preprocessing, and professional full-stack integration. 
+
+---
+
+## 📄 License
+MIT License
